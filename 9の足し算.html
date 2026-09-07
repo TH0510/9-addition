@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>9たす? の たしざんゲーム</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f9ff;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            user-select: none;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: #0284c7;
+            font-size: 24px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .frames-container {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .frame-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .ten-frame {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 6px;
+            border: 4px solid #334155;
+            background-color: #f8fafc;
+            padding: 6px;
+            border-radius: 12px;
+            width: 220px;
+            height: 90px;
+            box-sizing: border-box;
+            position: relative;
+        }
+        .cell {
+            border: 2px dashed #cbd5e1;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .dot {
+            width: 32px;
+            height: 32px;
+            background-color: #38bdf8;
+            border-radius: 50%;
+            box-shadow: inset 0 -3px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1);
+            position: absolute;
+            z-index: 2;
+        }
+        .dot.moving {
+            transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 10;
+        }
+        .equation {
+            font-size: 48px;
+            font-weight: 900;
+            color: #0f172a;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .btn {
+            background-color: #f1f5f9;
+            border: 3px solid #cbd5e1;
+            border-radius: 16px;
+            font-size: 28px;
+            font-weight: bold;
+            padding: 12px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #334155;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn.correct-choice {
+            background-color: #4ade80 !important;
+            border-color: #22c55e !important;
+            color: white !important;
+        }
+        .btn.wrong-choice {
+            background-color: #fca5a5 !important;
+            border-color: #ef4444 !important;
+            color: white !important;
+            opacity: 0.6;
+        }
+        .certificate {
+            display: none;
+            animation: pop 0.5s ease-out forwards;
+        }
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .cert-title {
+            font-size: 32px;
+            color: #ea580c;
+            margin-bottom: 10px;
+        }
+        .cert-text {
+            font-size: 20px;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        .restart-btn {
+            background-color: #ea580c;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(234, 88, 12, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="game-zone">
+        <h1>9たす？の たしざんトレーニング</h1>
+        
+        <div class="frames-container">
+            <div class="frame-wrapper">
+                <div class="ten-frame" id="left-frame"></div>
+            </div>
+            <div class="frame-wrapper">
+                <div class="ten-frame" id="right-frame"></div>
+            </div>
+        </div>
+
+        <div class="equation" id="equation-text">9 + 1 = ?</div>
+        <div class="options" id="options-container"></div>
+    </div>
+
+    <div id="cert-zone" class="certificate">
+        <div class="cert-title">🎉 おめでとう！ 🎉</div>
+        <div class="cert-text">
+            9もん ぜんぶ かんぺきに<br>
+            クリア できました！<br>
+            たいへん よくがんばりました💮
+        </div>
+        <button class="restart-btn" onclick="initGame()">もう一回 やる！</button>
+    </div>
+</div>
+
+<script>
+    let questions = [];
+    let currentIdx = 0;
+    let currentRight = 0;
+    let isAnimating = false;
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function initGame() {
+        questions = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        currentIdx = 0;
+        document.getElementById('game-zone').style.display = 'block';
+        document.getElementById('cert-zone').style.display = 'none';
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        isAnimating = false;
+        currentRight = questions[currentIdx];
+        document.getElementById('equation-text').innerText = `9 + ${currentRight} = ?`;
+        
+        renderLeftFrame();
+        renderRightFrame();
+        renderOptions();
+    }
+
+    function renderLeftFrame() {
+        const frame = document.getElementById('left-frame');
+        frame.innerHTML = '';
+        for (let i = 0; i < 10; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `left-cell-${i}`;
+            if (i < 9) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                cell.appendChild(dot);
+            }
+            frame.appendChild(cell);
+        }
+    }
+
+    function renderRightFrame() {
+        const frame = document.getElementById('right-frame');
+        frame.innerHTML = '';
+        for (let i = 0; i < 10; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            if (i < currentRight) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                dot.id = `right-dot-${i}`;
+                cell.appendChild(dot);
+            }
+            frame.appendChild(cell);
+        }
+    }
+
+    function renderOptions() {
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        
+        const ans = 9 + currentRight;
+        let choices = [ans];
+        while (choices.length < 3) {
+            let fake = Math.floor(Math.random() * 9) + 10; // 10〜18
+            if (!choices.includes(fake)) choices.push(fake);
+        }
+        shuffle(choices);
+
+        choices.forEach(num => {
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.innerText = num;
+            btn.onclick = () => checkAnswer(num, btn);
+            container.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(selected, clickedBtn) {
+        if (isAnimating) return;
+        const correctAns = 9 + currentRight;
+
+        if (selected === correctAns) {
+            isAnimating = true;
+            clickedBtn.classList.add('correct-choice');
+            document.getElementById('equation-text').innerText = `9 + ${currentRight} = ${correctAns}`;
+            
+            // 一番右端（最後）のドットを取得
+            const lastDotIndex = currentRight - 1;
+            const movingDot = document.getElementById(`right-dot-${lastDotIndex}`);
+            const targetCell = document.getElementById('left-cell-9');
+            
+            if (movingDot && targetCell) {
+                const startRect = movingDot.getBoundingClientRect();
+                const endRect = targetCell.getBoundingClientRect();
+                
+                movingDot.style.position = 'fixed';
+                movingDot.style.left = startRect.left + 'px';
+                movingDot.style.top = startRect.top + 'px';
+                movingDot.classList.add('moving');
+                
+                document.body.appendChild(movingDot);
+                
+                requestAnimationFrame(() => {
+                    movingDot.style.left = endRect.left + 2 + 'px'; 
+                    movingDot.style.top = endRect.top + 2 + 'px';
+                });
+
+                setTimeout(() => {
+                    movingDot.remove();
+                    nextQuestion();
+                }, 800);
+            } else {
+                setTimeout(nextQuestion, 800);
+            }
+        } else {
+            clickedBtn.classList.add('wrong-choice');
+            clickedBtn.disabled = true;
+        }
+    }
+
+    function nextQuestion() {
+        currentIdx++;
+        if (currentIdx < 9) {
+            loadQuestion();
+        } else {
+            document.getElementById('game-zone').style.display = 'none';
+            document.getElementById('cert-zone').style.display = 'block';
+        }
+    }
+
+    initGame();
+</script>
+</body>
+</html>
