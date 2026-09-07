@@ -26,7 +26,7 @@
             color: #0284c7;
             font-size: 24px;
             margin-top: 0;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
         .frames-container {
             display: flex;
@@ -114,6 +114,23 @@
             color: white !important;
             opacity: 0.6;
         }
+        .next-btn {
+            display: none;
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 14px 45px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(2, 132, 199, 0.3);
+            margin-top: 15px;
+            transition: all 0.2s;
+        }
+        .next-btn:active {
+            transform: scale(0.95);
+        }
         .certificate {
             display: none;
             animation: pop 0.5s ease-out forwards;
@@ -162,6 +179,7 @@
 
         <div class="equation" id="equation-text">9 + 1 = ?</div>
         <div class="options" id="options-container"></div>
+        <button id="next-btn" class="next-btn" onclick="nextQuestion()">つぎへ ➔</button>
     </div>
 
     <div id="cert-zone" class="certificate">
@@ -180,6 +198,9 @@
     let currentIdx = 0;
     let currentRight = 0;
     let isAnimating = false;
+
+    // 下段(セル5,6,7,8,9) -> 上段(セル0,1,2,3,4) の順に球を配置する設定
+    const fillOrder = [5, 6, 7, 8, 9, 0, 1, 2, 3, 4];
 
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -201,6 +222,7 @@
         isAnimating = false;
         currentRight = questions[currentIdx];
         document.getElementById('equation-text').innerText = `9 + ${currentRight} = ?`;
+        document.getElementById('next-btn').style.display = 'none';
         
         renderLeftFrame();
         renderRightFrame();
@@ -214,12 +236,15 @@
             const cell = document.createElement('div');
             cell.className = 'cell';
             cell.id = `left-cell-${i}`;
-            if (i < 9) {
-                const dot = document.createElement('div');
-                dot.className = 'dot';
-                cell.appendChild(dot);
-            }
             frame.appendChild(cell);
+        }
+        // 左フレームには9個の球を配置
+        for (let i = 0; i < 9; i++) {
+            const cellId = fillOrder[i];
+            const cell = document.getElementById(`left-cell-${cellId}`);
+            const dot = document.createElement('div');
+            dot.className = 'dot';
+            cell.appendChild(dot);
         }
     }
 
@@ -229,13 +254,17 @@
         for (let i = 0; i < 10; i++) {
             const cell = document.createElement('div');
             cell.className = 'cell';
-            if (i < currentRight) {
-                const dot = document.createElement('div');
-                dot.className = 'dot';
-                dot.id = `right-dot-${i}`;
-                cell.appendChild(dot);
-            }
+            cell.id = `right-cell-${i}`;
             frame.appendChild(cell);
+        }
+        // 右フレームには currentRight 個の球を配置
+        for (let i = 0; i < currentRight; i++) {
+            const cellId = fillOrder[i];
+            const cell = document.getElementById(`right-cell-${cellId}`);
+            const dot = document.createElement('div');
+            dot.className = 'dot';
+            dot.id = `right-dot-${i}`;
+            cell.appendChild(dot);
         }
     }
 
@@ -246,7 +275,7 @@
         const ans = 9 + currentRight;
         let choices = [ans];
         while (choices.length < 3) {
-            let fake = Math.floor(Math.random() * 9) + 10; // 10〜18
+            let fake = Math.floor(Math.random() * 9) + 10;
             if (!choices.includes(fake)) choices.push(fake);
         }
         shuffle(choices);
@@ -269,10 +298,15 @@
             clickedBtn.classList.add('correct-choice');
             document.getElementById('equation-text').innerText = `9 + ${currentRight} = ${correctAns}`;
             
-            // 一番右端（最後）のドットを取得
+            // 選択肢ボタンの無効化
+            const allBtns = document.querySelectorAll('.btn');
+            allBtns.forEach(btn => btn.disabled = true);
+
+            // 最後に配置された球（一番最後＝上段右端側の球）
             const lastDotIndex = currentRight - 1;
             const movingDot = document.getElementById(`right-dot-${lastDotIndex}`);
-            const targetCell = document.getElementById('left-cell-9');
+            // 左フレームの空きマス
+            const targetCell = document.getElementById(`left-cell-${fillOrder[9]}`);
             
             if (movingDot && targetCell) {
                 const startRect = movingDot.getBoundingClientRect();
@@ -292,10 +326,16 @@
 
                 setTimeout(() => {
                     movingDot.remove();
-                    nextQuestion();
-                }, 800);
+                    // 移動した球を左の空きマスに固定追加（左10個完成）
+                    const fixedDot = document.createElement('div');
+                    fixedDot.className = 'dot';
+                    targetCell.appendChild(fixedDot);
+
+                    // 「つぎへ」ボタンを表示
+                    document.getElementById('next-btn').style.display = 'inline-block';
+                }, 700);
             } else {
-                setTimeout(nextQuestion, 800);
+                document.getElementById('next-btn').style.display = 'inline-block';
             }
         } else {
             clickedBtn.classList.add('wrong-choice');
