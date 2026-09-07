@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>9たす? の たしざんゲーム</title>
+    <title>たしざんゲーム</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -16,17 +16,11 @@
         }
         .container {
             max-width: 600px;
-            margin: 0 auto;
+            margin: 20px auto 0 auto;
             background: white;
             padding: 30px 20px;
             border-radius: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        }
-        h1 {
-            color: #0284c7;
-            font-size: 24px;
-            margin-top: 0;
-            margin-bottom: 25px;
         }
         .frames-container {
             display: flex;
@@ -114,6 +108,13 @@
             color: white !important;
             opacity: 0.6;
         }
+        .action-btns {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-top: 15px;
+        }
         .next-btn {
             display: none;
             background-color: #0284c7;
@@ -125,10 +126,25 @@
             border-radius: 50px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(2, 132, 199, 0.3);
-            margin-top: 15px;
             transition: all 0.2s;
         }
         .next-btn:active {
+            transform: scale(0.95);
+        }
+        .replay-btn {
+            display: none;
+            background-color: #64748b;
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .replay-btn:active {
             transform: scale(0.95);
         }
         .certificate {
@@ -166,8 +182,6 @@
 
 <div class="container">
     <div id="game-zone">
-        <h1>9たす？の たしざんトレーニング</h1>
-        
         <div class="frames-container">
             <div class="frame-wrapper">
                 <div class="ten-frame" id="left-frame"></div>
@@ -179,7 +193,11 @@
 
         <div class="equation" id="equation-text">9 + 1 = ?</div>
         <div class="options" id="options-container"></div>
-        <button id="next-btn" class="next-btn" onclick="nextQuestion()">つぎへ ➔</button>
+        
+        <div class="action-btns">
+            <button id="next-btn" class="next-btn" onclick="nextQuestion()">つぎへ ➔</button>
+            <button id="replay-btn" class="replay-btn" onclick="replayAnimation()">もういちど 🔄</button>
+        </div>
     </div>
 
     <div id="cert-zone" class="certificate">
@@ -223,6 +241,7 @@
         currentRight = questions[currentIdx];
         document.getElementById('equation-text').innerText = `9 + ${currentRight} = ?`;
         document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('replay-btn').style.display = 'none';
         
         renderLeftFrame();
         renderRightFrame();
@@ -238,7 +257,7 @@
             cell.id = `left-cell-${i}`;
             frame.appendChild(cell);
         }
-        // 左フレームには9個の球を配置
+        // 左フレームには9個の球を配置 (下段5個＋上段4個)
         for (let i = 0; i < 9; i++) {
             const cellId = fillOrder[i];
             const cell = document.getElementById(`left-cell-${cellId}`);
@@ -289,7 +308,57 @@
         });
     }
 
-    function checkAnswer(selected, clickedBtn) {
+    function animateSingleDot(dot, targetCell, delay = 0) {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const startRect = dot.getBoundingClientRect();
+                const endRect = targetCell.getBoundingClientRect();
+                
+                dot.style.position = 'fixed';
+                dot.style.left = startRect.left + 'px';
+                dot.style.top = startRect.top + 'px';
+                dot.classList.add('moving');
+                
+                document.body.appendChild(dot);
+                
+                requestAnimationFrame(() => {
+                    dot.style.left = endRect.left + 2 + 'px'; 
+                    dot.style.top = endRect.top + 2 + 'px';
+                });
+
+                setTimeout(() => {
+                    dot.remove();
+                    const fixedDot = document.createElement('div');
+                    fixedDot.className = 'dot';
+                    targetCell.appendChild(fixedDot);
+                    resolve();
+                }, 650);
+            }, delay);
+        });
+    }
+
+    async function runMoveAnimation() {
+        // 9の補数は1なので、右から移動する球は1個
+        const moveCount = Math.min(1, currentRight);
+        let promises = [];
+
+        for (let i = 0; i < moveCount; i++) {
+            const dotIndex = currentRight - 1 - i;
+            const dot = document.getElementById(`right-dot-${dotIndex}`);
+            // 左の最後の空き枠（セル4：fillOrderの10番目）
+            const targetCell = document.getElementById(`left-cell-${fillOrder[9]}`);
+            
+            if (dot && targetCell) {
+                promises.push(animateSingleDot(dot, targetCell, i * 150));
+            }
+        }
+
+        if (promises.length > 0) {
+            await Promise.all(promises);
+        }
+    }
+
+    async function checkAnswer(selected, clickedBtn) {
         if (isAnimating) return;
         const correctAns = 9 + currentRight;
 
@@ -298,52 +367,39 @@
             clickedBtn.classList.add('correct-choice');
             document.getElementById('equation-text').innerText = `9 + ${currentRight} = ${correctAns}`;
             
-            // 選択肢ボタンの無効化
             const allBtns = document.querySelectorAll('.btn');
             allBtns.forEach(btn => btn.disabled = true);
 
-            // 最後に配置された球（一番最後＝上段右端側の球）
-            const lastDotIndex = currentRight - 1;
-            const movingDot = document.getElementById(`right-dot-${lastDotIndex}`);
-            // 左フレームの空きマス
-            const targetCell = document.getElementById(`left-cell-${fillOrder[9]}`);
+            await runMoveAnimation();
             
-            if (movingDot && targetCell) {
-                const startRect = movingDot.getBoundingClientRect();
-                const endRect = targetCell.getBoundingClientRect();
-                
-                movingDot.style.position = 'fixed';
-                movingDot.style.left = startRect.left + 'px';
-                movingDot.style.top = startRect.top + 'px';
-                movingDot.classList.add('moving');
-                
-                document.body.appendChild(movingDot);
-                
-                requestAnimationFrame(() => {
-                    movingDot.style.left = endRect.left + 2 + 'px'; 
-                    movingDot.style.top = endRect.top + 2 + 'px';
-                });
-
-                setTimeout(() => {
-                    movingDot.remove();
-                    // 移動した球を左の空きマスに固定追加（左10個完成）
-                    const fixedDot = document.createElement('div');
-                    fixedDot.className = 'dot';
-                    targetCell.appendChild(fixedDot);
-
-                    // 「つぎへ」ボタンを表示
-                    document.getElementById('next-btn').style.display = 'inline-block';
-                }, 700);
-            } else {
-                document.getElementById('next-btn').style.display = 'inline-block';
-            }
+            document.getElementById('next-btn').style.display = 'inline-block';
+            document.getElementById('replay-btn').style.display = 'inline-block';
+            isAnimating = false;
         } else {
             clickedBtn.classList.add('wrong-choice');
             clickedBtn.disabled = true;
         }
     }
 
+    async function replayAnimation() {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        // 一旦、初期配置（左9個・右N個）に戻す
+        renderLeftFrame();
+        renderRightFrame();
+
+        // 1秒間静止
+        await new Promise(r => setTimeout(r, 1000));
+
+        // アニメーション実行
+        await runMoveAnimation();
+
+        isAnimating = false;
+    }
+
     function nextQuestion() {
+        if (isAnimating) return;
         currentIdx++;
         if (currentIdx < 9) {
             loadQuestion();
